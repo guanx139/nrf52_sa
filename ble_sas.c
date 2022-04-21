@@ -123,9 +123,9 @@ static uint32_t sas_char_add(ble_sas_t * p_sas)
 
     
     // OUR_JOB: Step 2.H, Set characteristic length in number of bytes
-    attr_char_value.max_len     = 14;
-    attr_char_value.init_len    = 14;
-    uint8_t value[14]            = {0xAA,0xBB,0xCC,0xDD,0xAA,0xBB,0xCC,0xDD,0xAA,0xBB,0xCC,0xDD};
+    attr_char_value.max_len     = 16;
+    attr_char_value.init_len    = 16;
+    uint8_t value[16]            = {0xAA,0xBB,0xCC,0xDD,0xAA,0xBB,0xCC,0xDD,0xAA,0xBB,0xCC,0xDD};
     attr_char_value.p_value     = value;
 
     // OUR_JOB: Step 2.E, Add our new characteristic to the service
@@ -171,7 +171,7 @@ void ble_sas_init(ble_sas_t * p_sas)
 
 void sas_data_characteristic_update(ble_sas_t *p_sas, uint16_t *example_value){
     if (p_sas->conn_handle != BLE_CONN_HANDLE_INVALID){
-        uint16_t               len = 14;
+        uint16_t               len = 16;
         ble_gatts_hvx_params_t hvx_params;
         memset(&hvx_params, 0, sizeof(hvx_params));
 

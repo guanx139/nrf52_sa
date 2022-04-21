@@ -143,8 +143,8 @@
 #define APP_BLE_CONN_CFG_TAG            1                                       /**< A tag identifying the SoftDevice BLE configuration. */
 
 //Might need to do more testing on this, like current profile
-#define MIN_CONN_INTERVAL               MSEC_TO_UNITS(1850, UNIT_1_25_MS)        /**< Minimum acceptable connection interval (0.1 seconds). */
-#define MAX_CONN_INTERVAL               MSEC_TO_UNITS(1870, UNIT_1_25_MS)        /**< Maximum acceptable connection interval (0.2 second). */
+#define MIN_CONN_INTERVAL               MSEC_TO_UNITS(1650, UNIT_1_25_MS)        /**< Minimum acceptable connection interval (0.1 seconds). */
+#define MAX_CONN_INTERVAL               MSEC_TO_UNITS(1850, UNIT_1_25_MS)        /**< Maximum acceptable connection interval (0.2 second). */
 #define SLAVE_LATENCY                   0                                       /**< Slave latency. */
 #define CONN_SUP_TIMEOUT                MSEC_TO_UNITS(6000, UNIT_10_MS)         /**< Connection supervisory timeout (4 seconds). */
 #define TX_POWER                        -16
@@ -164,7 +164,9 @@
 #define DEAD_BEEF                       0xDEADBEEF                              /**< Value used as error code on stack dump, can be used to identify stack location on stack unwind. */
 
 
-#define SAS_TIMER_INTERVAL              APP_TIMER_TICKS(1850)                   // 1850 ms intervals
+
+//############### Start ###############//
+#define SAS_TIMER_INTERVAL              APP_TIMER_TICKS(1750)                   // 1850 ms intervals
 #define POWER_BUTTON_PRESS_TIME         APP_TIMER_TICKS(3000)                   // 3s 
 #define LED_OFF_TIME                    APP_TIMER_TICKS(1000)                   // 1s 
 #define DEVICE_INACTIVE_TIME          480                                     // 120 second, in the unit of 0.25s
@@ -185,6 +187,12 @@
 #define SAADC_BURST_MODE 0                        //Set to 1 to enable BURST mode, otherwise set to 0.
 #define ADC_BUF_FULL 1
 #define ADC_BUF_NOT_FULL 0
+
+//SA detection Macro
+//The following two macros are determined experimentally
+#define RESP_THRESHOLD 100 // The threshold of the presence of respitory signal
+#define RESP_AVG 1900 // The average respitory signal when no breath is detected
+#define SA_THRESHOLD 40 // The threshold for sa detection, the number here corrsponds ADC sample, each sample = 250 ms
 
 //#define UART_PRINTING_ENABLED 1
 
@@ -208,6 +216,45 @@ static void sas_char_timer_timeout_handler(void * p_context);
 static void power_button_timer_timeout_handler(void* p_context);
 static void signal_led_timer_timeout_handler(void * p_contex);
 
+//SA detection variable and function
+// counter for the number non breathing samples
+static uint16_t sa_counter = 0;
+// sa indication flag
+static bool is_sa =  false;
+// true when the device is ready to monitor sa events
+// set to true with first sample is breathing sample
+static bool ready = false;
+// the messgae sent together with the 7 samples indicate the sa_event
+// lower 7 bits are used to indication the presence of sa, 1 -> is_sa = true.
+static uint16_t sa_ble_message = 0;
+
+// this function is responsible for checking each sample, and based on the sa_conter to determine if sa occurs
+static void check_sa(uint16_t adc_val){
+  // set ready when a relatively large breath is detected.
+  if(abs(adc_val - RESP_AVG) > 100){
+    ready = true;
+  }
+  // check if the difference between adc_val and RESP_AVG is less that the threshold when device is ready
+  if((abs(adc_val - RESP_AVG) <= RESP_THRESHOLD) && ready){
+    sa_counter ++;
+  }
+  // otherwise, reset counter and is_sa flag
+  else if (ready){
+    sa_counter = 0;
+    is_sa = false;
+  }
+  // when counter values is larger that SA_THRESHOLD, set is_sa flag
+  if(sa_counter >= SA_THRESHOLD){
+    is_sa = true;
+    // left shift by 1, and toggle the lsb to 1
+    sa_ble_message = (sa_ble_message << 1) ^ 0x0001;
+  }
+  else{
+    // left shift by 1
+    sa_ble_message = (sa_ble_message << 1);
+  }
+}
+
 
 /**@brief Function for setting the radio tx power
 
@@ -225,10 +272,14 @@ static void is_device_active(uint16_t val, uint16_t buffer[ADC_BUF_SIZE]);
 
 static void sleep_mode_enter(void);
 
+//############### End ###############//
+
        
 #ifdef UART_PRINTING_ENABLED
 static uint32_t                m_adc_evt_counter = 0;
 #endif //UART_PRINTING_ENABLED
+
+//############### Start ###############//
 
 static bool                    m_saadc_initialized = false;    
 
@@ -248,7 +299,6 @@ static bool current_state = 0;
 
 
 
-
 // STEP 5: Declare variable holding our service UUID
 static ble_uuid_t m_adv_uuids[] = 
 {
@@ -257,6 +307,8 @@ static ble_uuid_t m_adv_uuids[] =
         BLE_UUID_TYPE_VENDOR_BEGIN
     }
 };
+
+//############### End ###############//
 
 static void advertising_start(bool erase_bonds);
 
@@ -276,6 +328,8 @@ void assert_nrf_callback(uint16_t line_num, const uint8_t * p_file_name)
 {
     app_error_handler(DEAD_BEEF, line_num, p_file_name);
 }
+
+//############### Start ###############//
 
 //Timer module
 /**@brief Function for the Timer initialization.
@@ -363,11 +417,28 @@ static void power_button_timer_timeout_handler(void* p_context){
 /**@brief Function will be called with sas_char_timer timeout and it will update the char value.
  */
 static void sas_char_timer_timeout_handler(void * p_context){
+    int i = 0;
+    uint16_t ble_msg [ADC_BUF_SIZE+1];
     if(buffer_status == ADC_BUF_FULL){
-        sas_data_characteristic_update(&m_sas, ADC_BUF);
+        for(i = 0; i < ADC_BUF_SIZE; i++){
+            ble_msg [i] = ADC_BUF[i];
+        }
+        ble_msg [i] = sa_ble_message;
+        sas_data_characteristic_update(&m_sas, ble_msg);
         buffer_status = ADC_BUF_NOT_FULL;
+        // sa_ble_message = 0;
     }
-
+    if(is_sa){
+        // sa indication LED, in this case we light up the signal LED, but
+        // it can use other gpio to enable the therapy
+        nrf_drv_gpiote_out_set(SIGNAL_LED); //turn on led
+        nrf_delay_ms(300);
+        nrf_drv_gpiote_out_clear(SIGNAL_LED);
+        nrf_delay_ms(300);
+        nrf_drv_gpiote_out_set(SIGNAL_LED); //turn on led
+        nrf_delay_ms(300);
+        nrf_drv_gpiote_out_clear(SIGNAL_LED);
+    }
 }
 
 /**@brief Function will be called when signal_led_timer timeout.
@@ -392,6 +463,8 @@ static void sleep_mode_enter(void)
     err_code = sd_power_system_off();
     APP_ERROR_CHECK(err_code);
 }
+
+//############### End ###############//
 
 
 /**@brief Function for handling Peer Manager events.
@@ -948,6 +1021,8 @@ static void advertising_start(bool erase_bonds)
     }
 }
 
+//############### Start ###############//
+
 /**@brief Function for handling the interupt of the power button, it will start the timer for the power button.
  */
 static void power_button_handler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action){
@@ -995,6 +1070,8 @@ static void rtc_handler(nrf_drv_rtc_int_type_t int_type)
             nrf_drv_saadc_sample();                                        //Trigger the SAADC SAMPLE task
             //adc_val++; //debugging only
             adc_val = get(m_buffer_pool);
+            //check for sa
+            check_sa(adc_val);
             //is_device_active(adc_val, ADC_BUF);
             put(adc_val, ADC_BUF);
         }
@@ -1212,6 +1289,7 @@ int main(void)
     }
 }
 
+//############### End ###############//
 
 /**
  * @}
