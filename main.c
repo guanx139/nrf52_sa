@@ -172,8 +172,8 @@
 #define DEVICE_INACTIVE_TIME          480                                     // 120 second, in the unit of 0.25s
 #define POWER_BUTTON                    20                                      /**< Pin number for the reset button for waking up the device from system OFF */
 //#define POWER_BUTTON                    28                                      /**< Pin number for the reset button for waking up the device from system OFF, for redBear board, Pin D2 */
-#define SIGNAL_LED                      12                                      /**< Pin number for the signaling LED */
-//#define SIGNAL_LED                      11                                      /**< Pin number for the signaling LED, redBear Board only */
+//#define SIGNAL_LED                      12                                      /**< Pin number for the signaling LED , pin 11 is for the redBear nano board*/
+#define SIGNAL_LED                      11                                      /**< Pin number for the signaling LED, redBear Board only */
 #define BUTTON_PRESSED                  0
 #define BUTTON_RELEASED                 1
 
@@ -242,16 +242,26 @@ static void check_sa(uint16_t adc_val){
   else if (ready){
     sa_counter = 0;
     is_sa = false;
+    //sa_ble_message = 0;
+    //nrf_drv_gpiote_out_clear(SIGNAL_LED); // turn off led
   }
   // when counter values is larger that SA_THRESHOLD, set is_sa flag
   if(sa_counter >= SA_THRESHOLD){
     is_sa = true;
+    //nrf_drv_gpiote_out_set(SIGNAL_LED); //turn on led
     // left shift by 1, and toggle the lsb to 1
     sa_ble_message = (sa_ble_message << 1) ^ 0x0001;
   }
   else{
     // left shift by 1
     sa_ble_message = (sa_ble_message << 1);
+  }
+  // for light up the led is sa is detected, this can be replaced by external circuit 
+  if (is_sa){
+    nrf_drv_gpiote_out_set(SIGNAL_LED); //turn on led
+  }
+  else{
+    nrf_drv_gpiote_out_clear(SIGNAL_LED); // turn off led
   }
 }
 
@@ -428,17 +438,17 @@ static void sas_char_timer_timeout_handler(void * p_context){
         buffer_status = ADC_BUF_NOT_FULL;
         // sa_ble_message = 0;
     }
-    if(is_sa){
+    //if(true){
         // sa indication LED, in this case we light up the signal LED, but
         // it can use other gpio to enable the therapy
-        nrf_drv_gpiote_out_set(SIGNAL_LED); //turn on led
-        nrf_delay_ms(300);
-        nrf_drv_gpiote_out_clear(SIGNAL_LED);
-        nrf_delay_ms(300);
-        nrf_drv_gpiote_out_set(SIGNAL_LED); //turn on led
-        nrf_delay_ms(300);
-        nrf_drv_gpiote_out_clear(SIGNAL_LED);
-    }
+        //nrf_drv_gpiote_out_set(SIGNAL_LED); //turn on led
+        //nrf_delay_ms(300);
+        //nrf_drv_gpiote_out_clear(SIGNAL_LED);
+        //nrf_delay_ms(300);
+        //nrf_drv_gpiote_out_set(SIGNAL_LED); //turn on led
+        //nrf_delay_ms(300);
+        //nrf_drv_gpiote_out_clear(SIGNAL_LED);
+    //}
 }
 
 /**@brief Function will be called when signal_led_timer timeout.
