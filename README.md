@@ -32,4 +32,4 @@ The example comes with some code for the device to be operate as BLE pheripheral
 
 ## Current Issues
 
-The ready flat is set no matter what if the absolute value between ADC value and ADV AVG is less that 1000.
+The ready flag is set no matter what if the absolute value between ADC value and ADV AVG is less that 1000.
