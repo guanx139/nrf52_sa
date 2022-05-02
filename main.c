@@ -172,7 +172,7 @@
 #define DEVICE_INACTIVE_TIME          480                                     // 120 second, in the unit of 0.25s
 #define POWER_BUTTON                    20                                      /**< Pin number for the reset button for waking up the device from system OFF */
 //#define POWER_BUTTON                    28                                      /**< Pin number for the reset button for waking up the device from system OFF, for redBear board, Pin D2 */
-//#define SIGNAL_LED                      12                                      /**< Pin number for the signaling LED , pin 11 is for the redBear nano board*/
+//#define SIGNAL_LED                      12                                      /**< Pin number for the signaling LED*/
 #define SIGNAL_LED                      11                                      /**< Pin number for the signaling LED, redBear Board only */
 #define BUTTON_PRESSED                  0
 #define BUTTON_RELEASED                 1
@@ -191,7 +191,7 @@
 //SA detection Macro
 //The following two macros are determined experimentally
 #define RESP_THRESHOLD 100 // The threshold of the presence of respitory signal
-#define RESP_AVG 1900 // The average respitory signal when no breath is detected
+#define RESP_AVG 1900 // The average respitory signal when no breath is detected. 1950 for RedBear Nano with 3.3V power, and 1750 for custom BLE with 3.2V power
 #define SA_THRESHOLD 40 // The threshold for sa detection, the number here corrsponds ADC sample, each sample = 250 ms
 
 //#define UART_PRINTING_ENABLED 1
@@ -221,47 +221,50 @@ static void signal_led_timer_timeout_handler(void * p_contex);
 static uint16_t sa_counter = 0;
 // sa indication flag
 static bool is_sa =  false;
-// true when the device is ready to monitor sa events
-// set to true with first sample is breathing sample
-static bool ready = false;
 // the messgae sent together with the 7 samples indicate the sa_event
 // lower 7 bits are used to indication the presence of sa, 1 -> is_sa = true.
 static uint16_t sa_ble_message = 0;
 
 // this function is responsible for checking each sample, and based on the sa_conter to determine if sa occurs
 static void check_sa(uint16_t adc_val){
+  // true when the device is ready to monitor sa events
+  // set to true with first sample is breathing sample
+  static bool ready = false;
+  int diff = adc_val - RESP_AVG;
   // set ready when a relatively large breath is detected.
-  if(abs(adc_val - RESP_AVG) > 100){
+  if((abs(diff) >= 1000)){
     ready = true;
   }
-  // check if the difference between adc_val and RESP_AVG is less that the threshold when device is ready
-  if((abs(adc_val - RESP_AVG) <= RESP_THRESHOLD) && ready){
-    sa_counter ++;
-  }
-  // otherwise, reset counter and is_sa flag
-  else if (ready){
-    sa_counter = 0;
-    is_sa = false;
-    //sa_ble_message = 0;
-    //nrf_drv_gpiote_out_clear(SIGNAL_LED); // turn off led
-  }
-  // when counter values is larger that SA_THRESHOLD, set is_sa flag
-  if(sa_counter >= SA_THRESHOLD){
-    is_sa = true;
-    //nrf_drv_gpiote_out_set(SIGNAL_LED); //turn on led
-    // left shift by 1, and toggle the lsb to 1
-    sa_ble_message = (sa_ble_message << 1) ^ 0x0001;
-  }
-  else{
-    // left shift by 1
-    sa_ble_message = (sa_ble_message << 1);
-  }
-  // for light up the led is sa is detected, this can be replaced by external circuit 
-  if (is_sa){
-    nrf_drv_gpiote_out_set(SIGNAL_LED); //turn on led
-  }
-  else{
-    nrf_drv_gpiote_out_clear(SIGNAL_LED); // turn off led
+  if(ready){
+    // nrf_drv_gpiote_out_set(SIGNAL_LED);
+    // check if the difference between adc_val and RESP_AVG is less that the threshold when device is ready
+    if((abs(adc_val - RESP_AVG) <= RESP_THRESHOLD)){
+      sa_counter ++;
+    }
+    // otherwise, reset counter and is_sa flag
+    else{
+      sa_counter = 0;
+      is_sa = false;
+      //sa_ble_message = 0;
+      //nrf_drv_gpiote_out_clear(SIGNAL_LED); // turn off led
+    }
+    // when counter values is larger that SA_THRESHOLD, set is_sa flag
+    if(sa_counter >= SA_THRESHOLD){
+      is_sa = true;
+      // left shift by 1, and toggle the lsb to 1
+      sa_ble_message = ((sa_ble_message << 1) ^ 0x0001) & 0x007f;
+    }
+    else{
+      // left shift by 1
+      sa_ble_message = ((sa_ble_message << 1)) & 0x007f;
+    }
+    // for light up the led is sa is detected, this can be replaced by external circuit 
+    if (is_sa){
+      nrf_drv_gpiote_out_set(SIGNAL_LED); //turn on led
+    }
+    else{
+      nrf_drv_gpiote_out_clear(SIGNAL_LED); // turn off led
+    }
   }
 }
 
@@ -778,7 +781,6 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
             set_radio_power(TX_POWER);
             //when the device is connected to cellphone, the rtc is enable
             nrf_drv_rtc_enable(&rtc); 
-
             break;
 
         case BLE_GAP_EVT_PHY_UPDATE_REQUEST:
@@ -1076,7 +1078,7 @@ static void rtc_handler(nrf_drv_rtc_int_type_t int_type)
         }
         m_saadc_initialized = true;                                    //Set SAADC as initialize
         if(buffer_status == ADC_BUF_NOT_FULL){
-            static uint16_t adc_val = 0;
+            static uint16_t adc_val = RESP_AVG;
             nrf_drv_saadc_sample();                                        //Trigger the SAADC SAMPLE task
             //adc_val++; //debugging only
             adc_val = get(m_buffer_pool);
