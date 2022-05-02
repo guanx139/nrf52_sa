@@ -29,3 +29,7 @@ An ADC is used to sample the respitory signal comes from the output of the analo
 ### boilerplate
 
 The example comes with some code for the device to be operate as BLE pheripheral device, like the connection interval etc
+
+## Current Issues
+
+The ready flat is set no matter what if the absolute value between ADC value and ADV AVG is less that 1000.
