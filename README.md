@@ -22,7 +22,7 @@ The entire program can be break down into three part, the custom BLE service, th
 
 This is a custom service for sa detector. The service is exptected to send 16 byte of information to the cellphone. 14 bytes are used for the adc value, and 2 bytes are used for the sa_message, which indicate the presence of sa event.
 
-### pherpherals
+### peripheral
 
 An ADC is used to sample the respitory signal comes from the output of the analog front end circuit at 4 Hz. There are some configurations for gpio and software timers.
 
