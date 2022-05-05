@@ -147,7 +147,7 @@
 #define MAX_CONN_INTERVAL               MSEC_TO_UNITS(1850, UNIT_1_25_MS)        /**< Maximum acceptable connection interval (0.2 second). */
 #define SLAVE_LATENCY                   0                                       /**< Slave latency. */
 #define CONN_SUP_TIMEOUT                MSEC_TO_UNITS(6000, UNIT_10_MS)         /**< Connection supervisory timeout (4 seconds). */
-#define TX_POWER                        -16
+#define TX_POWER                        0                                 /**< TX power for the BLE module. */
 #define FIRST_CONN_PARAMS_UPDATE_DELAY  APP_TIMER_TICKS(5000)                   /**< Time from initiating event (connect or start of notification) to first time sd_ble_gap_conn_param_update is called (5 seconds). */
 #define NEXT_CONN_PARAMS_UPDATE_DELAY   APP_TIMER_TICKS(30000)                  /**< Time between each call to sd_ble_gap_conn_param_update after the first call (30 seconds). */
 #define MAX_CONN_PARAMS_UPDATE_COUNT    3                                       /**< Number of attempts before giving up the connection parameter negotiation. */
@@ -172,8 +172,8 @@
 #define DEVICE_INACTIVE_TIME          480                                     // 120 second, in the unit of 0.25s
 #define POWER_BUTTON                    20                                      /**< Pin number for the reset button for waking up the device from system OFF */
 //#define POWER_BUTTON                    28                                      /**< Pin number for the reset button for waking up the device from system OFF, for redBear board, Pin D2 */
-//#define SIGNAL_LED                      12                                      /**< Pin number for the signaling LED*/
-#define SIGNAL_LED                      11                                      /**< Pin number for the signaling LED, redBear Board only */
+#define SIGNAL_LED                      12                                      /**< Pin number for the signaling LED*/
+//#define SIGNAL_LED                      11                                      /**< Pin number for the signaling LED, redBear Board only */
 #define BUTTON_PRESSED                  0
 #define BUTTON_RELEASED                 1
 
@@ -191,7 +191,7 @@
 //SA detection Macro
 //The following two macros are determined experimentally
 #define RESP_THRESHOLD 100 // The threshold of the presence of respitory signal
-#define RESP_AVG 1900 // The average respitory signal when no breath is detected. 1950 for RedBear Nano with 3.3V power, and 1750 for custom BLE with 3.2V power
+#define RESP_AVG 1750 // The average respitory signal when no breath is detected. 1950 for RedBear Nano with 3.3V power, and 1750 for custom BLE with 3.2V power
 #define SA_THRESHOLD 40 // The threshold for sa detection, the number here corrsponds ADC sample, each sample = 250 ms
 
 //#define UART_PRINTING_ENABLED 1
@@ -236,7 +236,6 @@ static void check_sa(uint16_t adc_val){
     ready = true;
   }
   if(ready){
-    // nrf_drv_gpiote_out_set(SIGNAL_LED);
     // check if the difference between adc_val and RESP_AVG is less that the threshold when device is ready
     if((abs(adc_val - RESP_AVG) <= RESP_THRESHOLD)){
       sa_counter ++;
@@ -246,7 +245,6 @@ static void check_sa(uint16_t adc_val){
       sa_counter = 0;
       is_sa = false;
       //sa_ble_message = 0;
-      //nrf_drv_gpiote_out_clear(SIGNAL_LED); // turn off led
     }
     // when counter values is larger that SA_THRESHOLD, set is_sa flag
     if(sa_counter >= SA_THRESHOLD){
@@ -260,10 +258,10 @@ static void check_sa(uint16_t adc_val){
     }
     // for light up the led is sa is detected, this can be replaced by external circuit 
     if (is_sa){
-      nrf_drv_gpiote_out_set(SIGNAL_LED); //turn on led
+      // nrf_drv_gpiote_out_set(SIGNAL_LED); //turn on led
     }
     else{
-      nrf_drv_gpiote_out_clear(SIGNAL_LED); // turn off led
+      // nrf_drv_gpiote_out_clear(SIGNAL_LED); // turn off led
     }
   }
 }
